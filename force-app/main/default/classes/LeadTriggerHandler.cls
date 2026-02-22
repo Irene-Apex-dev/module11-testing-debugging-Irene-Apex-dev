@@ -30,15 +30,14 @@ public with sharing class LeadTriggerHandler {
 	 * - If the title contains terms like 'assist', 'deputy', or 'jr',
 	 *   change the title to 'Assistant'.
 	 */
+
+	/*
 	public static void handleTitleNormalization(List<Lead> leadsToNormalize) {
 		for (Lead ld : leadsToNormalize) {
 			if (ld.title == 'vp' || ld.title.contains('v.p.') || ld.title.contains('vice president')) {
 				ld.Title = 'Vice President';
 			} else if (
-				ld.title.contains('mgr') ||
-				ld.title.contains('manage') ||
-				ld.title.contains('head of department')
-			) {
+				ld.title.contains('mgr') || ld.title.contains('manage') || ld.title.contains('head of department')) {
 				ld.Title = 'Manager';
 			} else if (ld.title.contains('exec') || ld.title == 'chief' || ld.title.contains('head')) {
 				ld.Title = 'Executive';
@@ -47,9 +46,37 @@ public with sharing class LeadTriggerHandler {
 			}
 		}
 	}
+	*/
+	public static void handleTitleNormalization(List<Lead> leadsToNormalize) {
 
-	/* 
-	 * Question 2
+		List<Lead> cleanedList = new List<Lead>();
+
+		for(Lead lead : leadsToNormalize) {
+			if (lead.Title != null) {
+				cleanedList.add(lead);
+			}
+
+		}
+
+		for (Lead ld : cleanedList) {
+			if (ld.Title == 'vp' || ld.Title.contains('v.p.') || ld.Title.contains('vice president')) {
+				ld.Title = 'Vice President';
+			} else if (
+				ld.Title.contains('mgr') || ld.Title.contains('manage') || ld.Title.contains('head of department')) {
+				ld.Title = 'Manager';
+			} else if (ld.Title.contains('exec') || ld.Title == 'chief' || ld.Title.contains('head')) {
+				ld.Title = 'Executive';
+			} else if (ld.Title.contains('assist') || ld.Title.contains('deputy') || ld.Title == 'jr') {
+				ld.Title = 'Assistant';
+			}
+
+		}
+
+	}
+
+	
+	
+	 /* Question 2
 	 * Requirement Auto Lead Scoring - handleAutoLeadScoring
 	 * Implement logic to automatically assign scores to leads based on specific criteria.
 	 * 18 should be highest possible score a lead can have.
@@ -59,8 +86,10 @@ public with sharing class LeadTriggerHandler {
 	 * - If the lead provides a phone number, increment score by 5 points.
 	 * - If the lead belongs to the 'Technology' industry, increment score by another 10 points.
 	 */
+	
 	public static void handleAutoLeadScoring(List<Lead> leadsToScore) {
 		for (Lead ld : leadsToScore) {
+			/*
 			Integer score = 10;
 
 			// Check and add points based on the specified conditions
@@ -75,10 +104,28 @@ public with sharing class LeadTriggerHandler {
 			if (ld.Industry == 'Technology') {
 				score = 10;
 			}
+			*/
+
+			Integer score = 0;// Initialize score to 0, so that the maximum score can't exceed 18
+
+			if (ld.LeadSource == 'Web' && ld.Email != null) {//LeadSource should be 'Web' instead of 'Website'
+				score += 3;
+			}
+
+			if (ld.Phone != null) {
+				score += 5;
+			}
+
+			if (ld.Industry == 'Technology') {
+				score += 10;
+			}
 
 			ld.Lead_Score__c = score; // Set the computed score back to the lead
+
 		}
+
 	}
+	
 
 	/* 
 	 * Question 3
@@ -103,14 +150,40 @@ public with sharing class LeadTriggerHandler {
 	 * - One of the errors is recursion related. Check if the lead is already converted or check if the email has changed/is null
 	 * - One of the errors is map related. Make sure you are using the correct contact map key
 	 */
-	public static void handleLeadAutoConvert(List<Lead> leads) {
+	
+	/*public static void handleLeadAutoConvert(List<Lead> leads) { 
+
 		// Step 1: Gather all lead emails
         Map<Id,String> leadToEmailMap = new Map<Id,String>();
 		for (Lead lead : leads) {
+			
 			leadToEmailMap.put(lead.Id, lead.Email);
+	
+		}
+		*/
+	
+	public static void handleLeadAutoConvert(List<Lead> leads, Map<Id, Lead> leadInfoPriorSave) {
+    // Step 1: Gather all lead emails
+    	Map<Id,String> leadToEmailMap = new Map<Id,String>();
+    
+    	for (Lead lead : leads) {
+			
+			// Check for new lead
+			Boolean isNewLead = leadInfoPriorSave == null || !leadInfoPriorSave.containsKey(lead.Id);
+			// Check for existing lead with changed email
+			Boolean hasEmailChanged = !isNewLead && lead.Email != leadInfoPriorSave.get(lead.Id).Email;
+															
+			//Check if the lead is already converted or check if the email has changed/is null                                           
+			if ((isNewLead && lead.IsConverted == false && lead.Email != null) || 
+				(!isNewLead && lead.IsConverted == false && hasEmailChanged)) {
+				leadToEmailMap.put(lead.Id, lead.Email);                                              
+			}
+
 		}
 
 		// Step 2: Find matching contacts based on email
+
+		/*
 		Map<String, Contact> emailToContactMap = new Map<String, Contact>();
 		for (Contact c : [SELECT Id, Email, AccountId FROM Contact WHERE Email IN :leadToEmailMap.values()]) {
 			if (!emailToContactMap.containsKey(c.Email)) {
@@ -120,6 +193,28 @@ public with sharing class LeadTriggerHandler {
 				// So we remove the email from the map.
 				emailToContactMap.remove(c.Email);
 			}
+		}
+		*/
+
+		Map<String, Integer> emailCount = new Map<String, Integer>();
+		for (Contact contact : [SELECT Id, Email, AccountId FROM Contact WHERE Email IN :leadToEmailMap.values()]) {
+			if (!emailCount.containsKey(contact.Email)) {
+				emailCount.put(contact.Email, 1);
+			} else {
+				emailCount.put(contact.Email, emailCount.get(contact.Email) + 1);
+			}
+		}
+		
+		List<String> singleEmails = new List<String>();
+		for (String email : emailCount.keySet()) {
+			if (emailCount.get(email) == 1)  {
+				singleEmails.add(email);
+			} 
+		}
+
+		Map<String, Contact> emailToContactMap = new Map<String, Contact>();
+		for (Contact contact : [SELECT Id, Email, AccountId FROM Contact WHERE Email IN :singleEmails]) {
+			emailToContactMap.put(contact.Email, contact);
 		}
 
 		// Step 3: Auto-convert leads
@@ -142,4 +237,6 @@ public with sharing class LeadTriggerHandler {
 			List<Database.LeadConvertResult> lcrs = Database.convertLead(leadConverts);
 		}
 	}
+	
+
 }

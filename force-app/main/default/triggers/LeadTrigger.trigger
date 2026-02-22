@@ -15,7 +15,8 @@
  * - It's essential to test the trigger thoroughly after making any changes to ensure its correct functionality.
  * - Debugging skills will be tested, so students should look out for discrepancies between the expected and actual behavior.
  */
-trigger LeadTrigger on Lead(before insert) {
+trigger LeadTrigger on Lead(before insert, before update, after insert, after update) {
+	/*
 	switch on Trigger.operationType {
 		when BEFORE_INSERT {
 			LeadTriggerHandler.handleTitleNormalization(Trigger.new);
@@ -31,5 +32,15 @@ trigger LeadTrigger on Lead(before insert) {
 		when AFTER_UPDATE {
 			LeadTriggerHandler.handleLeadAutoConvert(Trigger.new);
 		}
+	}
+	*/
+
+	if (trigger.isBefore) {
+		LeadTriggerHandler.handleTitleNormalization(Trigger.new);
+		LeadTriggerHandler.handleAutoLeadScoring(Trigger.new);
+	}
+
+	if (trigger.isAfter) {
+		LeadTriggerHandler.handleLeadAutoConvert(Trigger.new, Trigger.oldMap);
 	}
 }
