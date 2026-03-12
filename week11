@@ -1,0 +1,689 @@
+Week 11
+
+LeadTriggerHandler.cls
+/*
+ * The `LeadTriggerHandler` class contains methods designed to handle various business requirements around
+ * the Lead object in Salesforce. This includes functionality like normalizing the title field of a lead, 
+ * automatically scoring leads based on certain criteria, and auto-converting leads when certain conditions are met.
+ * - Create a test class for `LeadTriggerHandler` to ensure all methods work as expected.
+ * - Update the LeadTrigger class to call the `LeadTriggerHandler` methods as needed.
+ *
+ * Students should note:
+ * - This class may contain intentional errors that need to be fixed for proper functionality.
+ * - Create a corresponding test class for `LeadTriggerHandler` to ensure all methods work as expected.
+ *   Both positive and negative test cases should be considered.
+ *
+ * Documentation on Lead conversion and Test Classes can be found here:
+ * https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_dml_convertLead.htm
+ * https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_methods_system_test.htm
+ */
+public with sharing class LeadTriggerHandler {
+    /* 
+     * Question 1
+     * Requirement Lead Title Normalization - handleTitleNormalization
+     * Occasionally, users input titles in a variety of ways. Streamline these titles for consistency:
+     *
+     * Criteria:
+     * - If the title contains terms such as 'vp', 'v.p.', or 'vice president',
+     *   change the title to 'Vice President'.
+     * - If the title contains terms like 'mgr', 'manage', or 'head of department',
+     *   change the title to 'Manager'.
+     * - Should the title include words like 'exec', 'chief', or 'head',
+     *   change the title to 'Executive'.
+     * - If the title contains terms like 'assist', 'deputy', or 'jr',
+     *   change the title to 'Assistant'.
+     */
+
+    /*
+    public static void handleTitleNormalization(List<Lead> leadsToNormalize) {
+        for (Lead ld : leadsToNormalize) {
+            if (ld.title == 'vp' || ld.title.contains('v.p.') || ld.title.contains('vice president')) {
+                ld.Title = 'Vice President';
+            } else if (
+                ld.title.contains('mgr') || ld.title.contains('manage') || ld.title.contains('head of department')) {
+                ld.Title = 'Manager';
+            } else if (ld.title.contains('exec') || ld.title == 'chief' || ld.title.contains('head')) {
+                ld.Title = 'Executive';
+            } else if (ld.title.contains('assist') || ld.title.contains('deputy') || ld.title == 'jr') {
+                ld.Title = 'Assistant';
+            }
+        }
+    }
+    */
+    public static void handleTitleNormalization(List<Lead> leadsToNormalize) {
+
+        List<Lead> cleanedList = new List<Lead>();
+
+        for(Lead lead : leadsToNormalize) {
+            if (lead.Title != null) {
+                cleanedList.add(lead);
+            }
+
+        }
+
+        for (Lead ld : cleanedList) {
+            if (ld.Title == 'vp' || ld.Title.contains('v.p.') || ld.Title.contains('vice president')) {
+                ld.Title = 'Vice President';
+            } else if (
+                ld.Title.contains('mgr') || ld.Title.contains('manage') || ld.Title.contains('head of department')) {
+                ld.Title = 'Manager';
+            } else if (ld.Title.contains('exec') || ld.Title == 'chief' || ld.Title.contains('head')) {
+                ld.Title = 'Executive';
+            } else if (ld.Title.contains('assist') || ld.Title.contains('deputy') || ld.Title == 'jr') {
+                ld.Title = 'Assistant';
+            }
+
+        }
+
+    }
+
+    
+    
+     /* Question 2
+     * Requirement Auto Lead Scoring - handleAutoLeadScoring
+     * Implement logic to automatically assign scores to leads based on specific criteria.
+     * 18 should be highest possible score a lead can have.
+     *
+     * Criteria:
+     * - If the lead source is from the website and an email exists, increment score by 3 points.
+     * - If the lead provides a phone number, increment score by 5 points.
+     * - If the lead belongs to the 'Technology' industry, increment score by another 10 points.
+     */
+    
+    public static void handleAutoLeadScoring(List<Lead> leadsToScore) {
+        for (Lead ld : leadsToScore) {
+            /*
+            Integer score = 10;
+
+            // Check and add points based on the specified conditions
+            if (ld.LeadSource == 'Website' && ld.Email != null) {
+                score = 3;
+            }
+
+            if (ld.Phone != null) {
+                score = 5;
+            }
+
+            if (ld.Industry == 'Technology') {
+                score = 10;
+            }
+            */
+
+            Integer score = 0;// Initialize score to 0, so that the maximum score can't exceed 18
+
+            if (ld.LeadSource == 'Web' && ld.Email != null) {//LeadSource should be 'Web' instead of 'Website'
+                score += 3;
+            }
+
+            if (ld.Phone != null) {
+                score += 5;
+            }
+
+            if (ld.Industry == 'Technology') {
+                score += 10;
+            }
+
+            ld.Lead_Score__c = score; // Set the computed score back to the lead
+
+        }
+
+    }
+    
+
+    /* 
+     * Question 3
+     * Requirement Automatic Lead Conversion Based on Email Match - handleLeadAutoConvert
+     * Whenever a new Lead is created or an existing Lead's email address is updated,
+     * check for a matching Contact based on the email address. If a single matching
+     * Contact is identified, auto-convert the Lead.
+     * Use the Salesforce report Converted Lead to verify that the Lead was converted to the correct Contact.
+     *
+     * Criteria:
+     * - Monitor the "Email" field on the Lead object for creation or updates.
+     * - On Lead creation or email update, search the Contact object for records with the
+     *   same email address.
+     * - If a single matching Contact is identified:
+     *     - Auto-convert the Lead.
+     *     - Merge the Lead details with the existing Contact, ensuring that crucial
+     *       Contact information is preserved.
+     * - If multiple Contacts with the same email are found or no match is identified,
+     *   leave the Lead unconverted.
+     * 
+     * Hint: 
+     * - One of the errors is recursion related. Check if the lead is already converted or check if the email has changed/is null
+     * - One of the errors is map related. Make sure you are using the correct contact map key
+     */
+    
+    /*public static void handleLeadAutoConvert(List<Lead> leads) { 
+
+        // Step 1: Gather all lead emails
+        Map<Id,String> leadToEmailMap = new Map<Id,String>();
+        for (Lead lead : leads) {
+            
+            leadToEmailMap.put(lead.Id, lead.Email);
+    
+        }
+        */
+    
+    public static void handleLeadAutoConvert(List<Lead> leads, Map<Id, Lead> leadInfoPriorSave) {
+    // Step 1: Gather all lead emails
+        Map<Id,String> leadToEmailMap = new Map<Id,String>();
+    
+        for (Lead lead : leads) {
+            
+            // Check for new lead
+            Boolean isNewLead = leadInfoPriorSave == null || !leadInfoPriorSave.containsKey(lead.Id);
+            // Check for existing lead with changed email
+            Boolean hasEmailChanged = !isNewLead && lead.Email != leadInfoPriorSave.get(lead.Id).Email;
+                                                            
+            //Check if the lead is already converted or check if the email has changed/is null                                           
+            if ((isNewLead && lead.IsConverted == false && lead.Email != null) || 
+                (!isNewLead && lead.IsConverted == false && hasEmailChanged)) {
+                leadToEmailMap.put(lead.Id, lead.Email);                                              
+            }
+
+        }
+
+        // Step 2: Find matching contacts based on email
+
+        /*
+        Map<String, Contact> emailToContactMap = new Map<String, Contact>();
+        for (Contact c : [SELECT Id, Email, AccountId FROM Contact WHERE Email IN :leadToEmailMap.values()]) {
+            if (!emailToContactMap.containsKey(c.Email)) {
+                emailToContactMap.put(c.Email, c);
+            } else {
+                // If we found another contact with the same email, we don't auto-convert.
+                // So we remove the email from the map.
+                emailToContactMap.remove(c.Email);
+            }
+        }
+        */
+
+        Map<String, Integer> emailCount = new Map<String, Integer>();
+        for (Contact contact : [SELECT Id, Email, AccountId FROM Contact WHERE Email IN :leadToEmailMap.values()]) {
+            if (!emailCount.containsKey(contact.Email)) {
+                emailCount.put(contact.Email, 1);
+            } else {
+                emailCount.put(contact.Email, emailCount.get(contact.Email) + 1);
+            }
+        }
+        
+        List<String> singleEmails = new List<String>();
+        for (String email : emailCount.keySet()) {
+            if (emailCount.get(email) == 1)  {
+                singleEmails.add(email);
+            } 
+        }
+
+        Map<String, Contact> emailToContactMap = new Map<String, Contact>();
+        for (Contact contact : [SELECT Id, Email, AccountId FROM Contact WHERE Email IN :singleEmails]) {
+            emailToContactMap.put(contact.Email, contact);
+        }
+
+        // Step 3: Auto-convert leads
+        List<Database.LeadConvert> leadConverts = new List<Database.LeadConvert>();
+        LeadStatus convertStatus = [SELECT Id, MasterLabel FROM LeadStatus WHERE IsConverted = TRUE LIMIT 1];
+        for (Id leadId : leadToEmailMap.keySet()) {
+            String leadEmail = leadToEmailMap.get(leadId);
+            if (emailToContactMap.containsKey(leadEmail)) {
+                Database.LeadConvert lc = new Database.LeadConvert();
+                lc.setLeadId(leadId);
+                lc.setContactId(emailToContactMap.get(leadEmail).Id); // Use existing Contact Id
+                lc.setAccountId(emailToContactMap.get(leadEmail).AccountId); // Use existing Account Id
+                lc.setDoNotCreateOpportunity(true); // Assuming we don't want to create an opportunity
+                lc.setConvertedStatus(convertStatus.MasterLabel); // Set the converted status
+                leadConverts.add(lc);
+            }
+        }
+
+        if (!leadConverts.isEmpty()) {
+            List<Database.LeadConvertResult> lcrs = Database.convertLead(leadConverts);
+        }
+    }
+    
+
+}
+
+LeadTriggerHandlerTest.cls
+
+/**
+ * This class contains unit tests for validating the behavior of Apex classes
+ * and triggers.
+ *
+ * Unit tests are class methods that verify whether a particular piece
+ * of code is working properly. Unit test methods take no arguments,
+ * commit no data to the database, and are flagged with the testMethod
+ * keyword in the method definition.
+ *
+ * All test methods in an org are executed whenever Apex code is deployed
+ * to a production org to confirm correctness, ensure code
+ * coverage, and prevent regressions. All Apex classes are
+ * required to have at least 75% code coverage in order to be deployed
+ * to a production org. In addition, all triggers must have some code coverage.
+ * 
+ * The @isTest class annotation indicates this class only contains test
+ * methods. Classes defined with the @isTest annotation do not count against
+ * the org size limit for all Apex scripts.
+ *
+ * See the Apex Language Reference for more information about Testing and Code Coverage.
+ */
+@isTest
+public class LeadTriggerHandlerTest {
+
+    @isTest
+    public static void handleTitleNormalizationCorrectionUnitTest() {
+        
+        // Create leads with various titles that should be normalized
+        List<Lead> leads = new List<Lead>();
+
+        for (Integer i = 0; i < 200; i++) {
+            Lead lead = new Lead();
+            lead.FirstName = 'firstName' + i; 
+            lead.LastName = 'lastName' + i;
+            lead.Company = 'company' + i;
+
+            if (lead.FirstName.contains('1') || lead.FirstName.contains('7')) {
+                lead.title = 'vp';
+            } else if (lead.FirstName.contains('2') || lead.FirstName.contains('8')) {
+                lead.title = 'mgr';
+            } else if (lead.FirstName.contains('3') || lead.FirstName.contains('9')) {
+                lead.title = 'exec';
+            } else if (lead.FirstName.contains('4') || lead.FirstName.contains('0')) {
+                lead.title = 'assist';
+            }
+
+            leads.add(lead);
+        }
+
+        insert leads;
+
+        //Test.startTest();
+            LeadTriggerHandler.handleTitleNormalization(leads);
+        //Test.stopTest();
+
+        // Query the inserted leads to verify that the titles were normalized correctly
+        List<Lead> insertedVPLeads = [
+            SELECT Id, Title 
+            FROM Lead 
+            WHERE LastName LIKE 'LastName7' 
+            LIMIT 1
+        ];
+        Assert.areEqual('Vice President', insertedVPLeads[0].Title, 'The title should be normalized to \'Vice President\'');
+
+        List<Lead> insertedManagerLeads = [
+            SELECT Id, Title 
+            FROM Lead 
+            WHERE LastName LIKE 'LastName8' 
+            LIMIT 1
+        ];
+        Assert.areEqual('Manager', insertedManagerLeads[0].Title, 'The title should be normalized to \'Manager\'');
+        
+        List<Lead> insertedExecutiveLeads = [
+            SELECT Id, Title 
+            FROM Lead 
+            WHERE LastName LIKE 'LastName9' 
+            LIMIT 1
+        ];
+        Assert.areEqual('Executive', insertedExecutiveLeads[0].Title, 'The title should be normalized to \'Executive\'');
+
+        List<Lead> insertedAssistLeads = [
+            SELECT Id, Title 
+            FROM Lead 
+            WHERE LastName LIKE 'LastName0' 
+            LIMIT 1
+        ];
+        Assert.areEqual('Assistant', insertedAssistLeads[0].Title, 'The title should be normalized to \'Assistant\'');
+
+    }
+
+
+    @isTest
+    public static void handleTitleNormalizationNoCorrectionUnitTest() {
+
+        // Create leads with various titles that should NOT be normalized
+        List<Lead> leads = new List<Lead>();
+
+        for (Integer i = 0; i < 200; i++) {
+            Lead lead = new Lead();
+            lead.FirstName = 'firstName' + i; 
+            lead.LastName = 'lastName' + i;
+            lead.Company = 'company' + i;
+
+            if (lead.FirstName.contains('1') || lead.FirstName.contains('7')) {
+                lead.title = 'test';
+            } else if (lead.FirstName.contains('2') || lead.FirstName.contains('8')) {
+                lead.title = 'no title';
+            } else if (lead.FirstName.contains('3') || lead.FirstName.contains('9')) {
+                lead.title = 'junior';
+            } else if (lead.FirstName.contains('4') || lead.FirstName.contains('0')) {
+                lead.title = 'senior';
+            }
+
+            leads.add(lead);
+        }
+
+        insert leads;
+
+        //Test.startTest();
+            LeadTriggerHandler.handleTitleNormalization(leads);
+        //Test.stopTest();
+
+        // Query the inserted leads to verify that the titles were NOT normalized and remain unchanged
+        List<Lead> insertedTestLeads = [
+            SELECT Id, Title 
+            FROM Lead 
+            WHERE LastName LIKE 'LastName7' 
+            LIMIT 1
+        ];
+        Assert.areEqual('test', insertedTestLeads[0].Title, 'The title should be \'test\'');
+
+        List<Lead> insertedNoTitleLeads = [
+            SELECT Id, Title 
+            FROM Lead 
+            WHERE LastName LIKE 'LastName8' 
+            LIMIT 1
+        ];
+        Assert.areEqual('no title', insertedNoTitleLeads[0].Title, 'The title should be \'no title\'');
+        
+        List<Lead> insertedJuniorLeads = [
+            SELECT Id, Title 
+            FROM Lead 
+            WHERE LastName LIKE 'LastName9' 
+            LIMIT 1
+        ];
+        Assert.areEqual('junior', insertedJuniorLeads[0].Title, 'The title should be \'junior\'');
+
+        List<Lead> insertedSeniorLeads = [
+            SELECT Id, Title 
+            FROM Lead 
+            WHERE LastName LIKE 'LastName0' 
+            LIMIT 1
+        ];
+        Assert.areEqual('senior', insertedSeniorLeads[0].Title, 'The title should be \'senior\'');
+
+    }
+
+    @isTest
+    public static void handleAutoLeadScoringUpdateScoreUnitTest() {
+
+        // Create leads with various attributes that should contribute to lead scoring
+        List<Lead> leads = new List<Lead>();
+
+        for (Integer i = 0; i < 200; i++) {
+            Lead lead = new Lead();
+            lead.FirstName = 'firstName' + i; 
+            lead.LastName = 'lastName' + i;
+            lead.Company = 'company' + i;
+
+            if (lead.FirstName.contains('1') || lead.FirstName.contains('7')) {
+                lead.LeadSource = 'Web';
+                lead.Email = 'test' + i + '@' + lead.Company + '.com';
+            } else if (lead.FirstName.contains('2') || lead.FirstName.contains('8')) {
+                lead.Phone = '1234567890';
+            } else if (lead.FirstName.contains('3') || lead.FirstName.contains('9')) {
+                lead.Industry = 'Technology';
+            } else if (lead.FirstName.contains('4') || lead.FirstName.contains('0')) {
+                lead.LeadSource = 'Web';
+                lead.Email = 'test' + i + '@' + lead.Company + '.com';
+                lead.Phone = '1234567890';
+                lead.Industry = 'Technology';
+            }
+
+            leads.add(lead);
+        }
+
+        insert leads;
+
+        //Test.startTest();
+            LeadTriggerHandler.handleAutoLeadScoring(leads);
+        //Test.stopTest();
+
+        // Query the inserted leads to verify that the lead scores were calculated correctly based on the specified criteria
+        List<Lead> insertedWebLeads = [
+            SELECT Id, Lead_Score__c
+            FROM Lead 
+            WHERE LastName LIKE 'LastName7' 
+            LIMIT 1
+        ];
+        Assert.areEqual(3, insertedWebLeads[0].Lead_Score__c, 'The lead score should be 3');
+
+        List<Lead> insertedPhoneLeads = [
+            SELECT Id, Lead_Score__c
+            FROM Lead 
+            WHERE LastName LIKE 'LastName8' 
+            LIMIT 1
+        ];
+        Assert.areEqual(5, insertedPhoneLeads[0].Lead_Score__c, 'The lead score should be 5');
+        
+        List<Lead> insertedTechnologyLeads = [
+            SELECT Id, Lead_Score__c
+            FROM Lead 
+            WHERE LastName LIKE 'LastName9' 
+            LIMIT 1
+        ];
+        Assert.areEqual(10, insertedTechnologyLeads[0].Lead_Score__c, 'The lead score should be 10');
+
+        List<Lead> insertedMaxScoreLeads = [
+            SELECT Id, Lead_Score__c
+            FROM Lead 
+            WHERE LastName LIKE 'LastName0' 
+            LIMIT 1
+        ];
+        Assert.areEqual(18, insertedMaxScoreLeads[0].Lead_Score__c, 'The lead score should be 18');
+
+    }
+
+
+    @isTest
+    public static void handleAutoLeadScoringNoUpdateUnitTest() {
+
+        // Create leads with attributes that do not meet any of the scoring criteria
+        List<Lead> leads = new List<Lead>();
+
+        for (Integer i = 0; i < 200; i++) {
+            Lead lead = new Lead();
+            lead.FirstName = 'firstName' + i; 
+            lead.LastName = 'lastName' + i;
+            lead.Company = 'company' + i;
+
+            if (lead.FirstName.contains('1') || lead.FirstName.contains('7')) {
+                lead.LeadSource = 'Website';
+                lead.Email = 'test' + i + '@' + lead.Company + '.com';
+            } else if (lead.FirstName.contains('2') || lead.FirstName.contains('8')) {
+                lead.Email = 'test' + i + '@' + lead.Company + '.com';
+            } else if (lead.FirstName.contains('3') || lead.FirstName.contains('9')) {
+                lead.Industry = 'Other';
+            } 
+
+            leads.add(lead);
+        }
+
+        insert leads;
+
+        //Test.startTest();
+            LeadTriggerHandler.handleAutoLeadScoring(leads);
+        //Test.stopTest();
+
+        // Query the inserted leads to verify that the lead scores were not updated and remain at their default value (assuming default is 0) since they do not meet any of the specified criteria
+        List<Lead> insertedWebLeads = [
+            SELECT Id, Lead_Score__c
+            FROM Lead 
+            WHERE LastName LIKE 'LastName7' 
+            LIMIT 1
+        ];
+        Assert.areEqual(0, insertedWebLeads[0].Lead_Score__c, 'The lead score should be 0');
+
+        List<Lead> insertedEmailLeads = [
+            SELECT Id, Lead_Score__c
+            FROM Lead 
+            WHERE LastName LIKE 'LastName8' 
+            LIMIT 1
+        ];
+        Assert.areEqual(0, insertedEmailLeads[0].Lead_Score__c, 'The lead score should be 0');
+        
+        List<Lead> insertedOtherSourceLeads = [
+            SELECT Id, Lead_Score__c
+            FROM Lead 
+            WHERE LastName LIKE 'LastName9' 
+            LIMIT 1
+        ];
+        Assert.areEqual(0, insertedOtherSourceLeads[0].Lead_Score__c, 'The lead score should be 0');
+
+    }
+
+
+    @isTest
+    public static void handleLeadAutoConvertOneMatchUnitTest() {
+        // Create a account
+        Account account = new Account();
+        account.Name = 'TestCompany';
+        insert account;
+
+        // Create a contact
+        Contact contact = new Contact();
+        contact.FirstName = 'John';
+        contact.LastName = 'Doe';
+        contact.Email = 'john.doe@testcompany.com';
+        contact.AccountId = account.Id;
+        insert contact;
+
+        List<Lead> leads = new List<Lead>();
+
+        // Create a lead with an email that matches the contact's email
+        Lead lead = new Lead();
+        lead.FirstName = 'John';
+        lead.LastName = 'Doe';
+        lead.Company = 'TestCompany';
+        lead.Email = 'john.doe@testcompany.com';
+        leads.add(lead);
+
+        Test.setMock(HttpCalloutMock.class, new DummyJSONCalloutMockGenerator());
+        Test.startTest();
+        insert leads;
+        Test.stopTest();
+
+        // Query the lead to verify that it was converted
+        Lead convertedLead = [
+            SELECT Id, FirstName, LastName, Email, IsConverted, ConvertedContactId, ConvertedAccountId
+            FROM Lead
+            WHERE Email = 'john.doe@testcompany.com' AND IsConverted = true
+        ];
+
+        Assert.areEqual(convertedLead.ConvertedContactId, contact.Id, 'The contact Id should be the same');
+        Assert.areEqual(convertedLead.ConvertedAccountId, account.Id, 'The account Id should be the same');
+    }
+
+
+    @isTest
+    public static void handleLeadAutoConvertTwoMatcheshUnitTest() {
+        // Create a account
+        Account account = new Account();
+        account.Name = 'TestCompany';
+        insert account;
+
+        // Create first contact
+        Contact contact1 = new Contact();
+        contact1.FirstName = 'John';
+        contact1.LastName = 'Doe';
+        contact1.Email = 'j.doe@testcompany.com';
+        contact1.AccountId = account.Id;
+        insert contact1;
+
+        // Create second contact
+        Contact contact2 = new Contact();
+        contact2.FirstName = 'Jane';
+        contact2.LastName = 'Doe';
+        contact2.Email = 'J.Doe@testcompany.com';
+        contact2.AccountId = account.Id;
+        insert contact2;
+
+                // Create third contact
+        Contact contact3 = new Contact();
+        contact3.FirstName = 'Jane';
+        contact3.LastName = 'Doe';
+        contact3.Email = 'J.Doe@testcompany.com';
+        contact3.AccountId = account.Id;
+        insert contact3;
+
+        List<Lead> leads = new List<Lead>();
+
+        // Create a lead with an email that matches the contacts email
+        Lead lead = new Lead();
+        lead.FirstName = 'John';
+        lead.LastName = 'Doe';
+        lead.Company = 'TestCompany';
+        lead.Email = 'J.Doe@testcompany.com';
+        leads.add(lead);
+
+        Test.setMock(HttpCalloutMock.class, new DummyJSONCalloutMockGenerator());
+        Test.startTest();
+        insert leads;
+        Test.stopTest();
+
+        // Query the lead to verify that it was converted
+        Lead nonConvertedLead = [
+            SELECT Id, FirstName, LastName, Email, IsConverted, ConvertedContactId, ConvertedAccountId
+            FROM Lead
+            WHERE Email = 'j.doe@testcompany.com' AND IsConverted = false
+        ];
+
+       Assert.areEqual(nonConvertedLead.IsConverted, false, 'The lead should not be converted');
+       Assert.areEqual(nonConvertedLead.ConvertedContactId, null, 'The contact Id should be null');
+       Assert.areEqual(nonConvertedLead.ConvertedAccountId, null, 'The account Id should be null');
+    }
+
+}
+
+LeadTrigger.trigger
+
+/*
+ * The `LeadTrigger` is designed to automate certain processes around the Lead object in Salesforce. 
+ * This trigger invokes various methods from the `LeadTriggerHandler` class based on different trigger 
+ * events like insert and update.
+ * 
+ * Here's a brief rundown of the operations:
+ * 1. BEFORE INSERT and BEFORE UPDATE:
+ *    - Normalize the Lead's title for consistency using `handleTitleNormalization` method.
+ *    - Score leads based on certain criteria using the `handleAutoLeadScoring` method.
+ * 2. AFTER INSERT and AFTER UPDATE:
+ *    - Check if the Lead can be auto-converted using the `handleLeadAutoConvert` method.
+ *
+ * Students should note:
+ * - This trigger contains intentional errors that need to be identified and corrected.
+ * - It's essential to test the trigger thoroughly after making any changes to ensure its correct functionality.
+ * - Debugging skills will be tested, so students should look out for discrepancies between the expected and actual behavior.
+ */
+trigger LeadTrigger on Lead(before insert, before update, after insert, after update) {
+    /*
+    switch on Trigger.operationType {
+        when BEFORE_INSERT {
+            LeadTriggerHandler.handleTitleNormalization(Trigger.new);
+            LeadTriggerHandler.handleAutoLeadScoring(Trigger.new);
+        }
+        when BEFORE_UPDATE {
+            LeadTriggerHandler.handleTitleNormalization(Trigger.new);
+            LeadTriggerHandler.handleAutoLeadScoring(Trigger.new);
+        }
+        when AFTER_INSERT {
+            LeadTriggerHandler.handleLeadAutoConvert(Trigger.new);
+        }
+        when AFTER_UPDATE {
+            LeadTriggerHandler.handleLeadAutoConvert(Trigger.new);
+        }
+    }
+    */
+
+    if (trigger.isBefore) {
+        LeadTriggerHandler.handleTitleNormalization(Trigger.new);
+        LeadTriggerHandler.handleAutoLeadScoring(Trigger.new);
+    }
+
+    if (trigger.isAfter) {
+        LeadTriggerHandler.handleLeadAutoConvert(Trigger.new, Trigger.oldMap);
+    }
+}
+
+
+
+
+
