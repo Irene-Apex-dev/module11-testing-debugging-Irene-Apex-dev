@@ -28,7 +28,7 @@ public with sharing class LeadTriggerHandler {
 	 * - Should the title include words like 'exec', 'chief', or 'head',
 	 *   change the title to 'Executive'.
 	 * - If the title contains terms like 'assist', 'deputy', or 'jr',
-	 *   change the title to 'Assistant'.
+	 *   change the title to 'Assistant'. 
 	 */
 
 	/*
