@@ -236,7 +236,7 @@ public with sharing class LeadTriggerHandler {
 		if (!leadConverts.isEmpty()) {
 			List<Database.LeadConvertResult> lcrs = Database.convertLead(leadConverts);
 		}
-	}
+	} 
 	
 
 }
