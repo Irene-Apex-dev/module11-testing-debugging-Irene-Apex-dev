@@ -33,9 +33,6 @@ public with sharing class LeadTriggerHandler {
 
 	/*
 	public static void handleTitleNormalization(List<Lead> leadsToNormalize) {
-		/*
-		Test
-		*/ 
 		for (Lead ld : leadsToNormalize) {
 			if (ld.title == 'vp' || ld.title.contains('v.p.') || ld.title.contains('vice president')) {
 				ld.Title = 'Vice President';
